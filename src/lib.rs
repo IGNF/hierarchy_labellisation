@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use ndarray::Array3;
 
 use wasm_bindgen::prelude::*;
@@ -5,6 +7,30 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub fn add(left: usize, right: usize) -> usize {
     left + right
+}
+
+#[wasm_bindgen]
+pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize) -> Box<[u8]> {
+    let array = Array3::from_shape_vec((channels, height, width), data.to_vec()).unwrap();
+
+    let mut output = image::ImageBuffer::new(width as u32, height as u32);
+
+    for y in 0..height {
+        for x in 0..width {
+            let pixel = image::Rgb([
+                array[[0, y, x]] as u8,
+                array[[1, y, x]] as u8,
+                array[[2, y, x]] as u8,
+            ]);
+            output.put_pixel(x as u32, y as u32, pixel);
+        }
+    }
+
+    // Convert to png and return
+    let mut buffer = Vec::new();
+    output.write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png).unwrap();
+
+    buffer.into_boxed_slice()
 }
 
 #[cfg(test)]
