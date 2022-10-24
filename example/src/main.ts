@@ -1,4 +1,4 @@
-import { add, convert_to_png } from 'hierarchy_labellisation';
+import { add, convert_to_png, slic_from_js } from 'hierarchy_labellisation';
 import { fromArrayBuffer, TypedArray } from 'geotiff';
 
 console.log(add(1, 2));
@@ -56,7 +56,9 @@ async function readTiff(buffer: ArrayBuffer) {
 async function processTiff(buffer: ArrayBuffer) {
     const tiff = await readTiff(buffer);
 
-    const result = convert_to_png(tiff.data, tiff.width, tiff.height, tiff.channels);
+    // const result = convert_to_png(tiff.data, tiff.width, tiff.height, tiff.channels);
+    const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 2000, 10);
+
 
     const blob = new Blob([result], { type: 'image/png' });
     const url = URL.createObjectURL(blob);

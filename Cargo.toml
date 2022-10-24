@@ -12,5 +12,7 @@ crate-type = ["cdylib", "rlib"]
 geotiff = "0.0.2"
 image = "0.24.4"
 ndarray = "0.15.6"
+palette = "0.6.1"
+simple_clustering = "0.1.0"
 wasm-bindgen = "0.2"
 

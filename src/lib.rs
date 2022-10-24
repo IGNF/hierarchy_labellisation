@@ -1,7 +1,8 @@
 use std::io::Cursor;
 
-use ndarray::Array3;
+use ndarray::{s, Array3};
 
+use simple_clustering::{image::segment_contours, slic_from_bytes};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -11,7 +12,8 @@ pub fn add(left: usize, right: usize) -> usize {
 
 #[wasm_bindgen]
 pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize) -> Box<[u8]> {
-    let array = Array3::from_shape_vec((channels, height, width), data.to_vec()).unwrap();
+    let array = Array3::from_shape_vec((channels, height, width), data.to_vec())
+        .expect_throw("Data doesn't have the right shape");
 
     let mut output = image::ImageBuffer::new(width as u32, height as u32);
 
@@ -28,7 +30,79 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
 
     // Convert to png and return
     let mut buffer = Vec::new();
-    output.write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png).unwrap();
+    output
+        .write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png)
+        .unwrap();
+
+    buffer.into_boxed_slice()
+}
+
+pub fn slic(img: Array3<u8>, n_clusters: usize, compactness: f32) -> Array3<u8> {
+    let (height, width, _channels) = img.dim();
+
+    let img_array_sliced = img.slice(s![.., .., ..3usize]).to_owned();
+    let mut img_array_std_layout = img_array_sliced.as_standard_layout();
+    let img_slice = img_array_std_layout
+        .as_slice_mut()
+        .expect_throw("Fail to convert to slice");
+
+    let clusters = slic_from_bytes(
+        n_clusters as u32,
+        1,
+        width as u32,
+        height as u32,
+        Some(10),
+        img_slice,
+    )
+    .expect_throw("SLIC failed");
+
+    segment_contours(
+        img_slice,
+        width as u32,
+        height as u32,
+        &clusters,
+        [0; 3],
+    )
+    .expect_throw("Failed to compute contours");
+
+    img_array_std_layout.to_owned()
+}
+
+#[wasm_bindgen]
+pub fn slic_from_js(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    channels: usize,
+    n_clusters: usize,
+    compactness: f32,
+) -> Box<[u8]> {
+    let mut array = Array3::from_shape_vec((channels, height, width), data.to_vec())
+        .expect_throw("Data doesn't have the right shape");
+
+    array.swap_axes(0, 1);
+    array.swap_axes(1, 2);
+
+    let labels = slic(array, n_clusters, compactness);
+
+    let mut output = image::ImageBuffer::new(width as u32, height as u32);
+
+    for y in 0..height {
+        for x in 0..width {
+            let pixel = image::Rgb([
+                labels[[y, x, 0]] as u8,
+                labels[[y, x, 1]] as u8,
+                labels[[y, x, 2]] as u8,
+            ]);
+            output.put_pixel(x as u32, y as u32, pixel);
+        }
+    }
+
+    // Convert to png and return
+    let mut buffer = Vec::new();
+    output
+        .write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png)
+        .expect_throw("Failed to write to png");
 
     buffer.into_boxed_slice()
 }
@@ -73,11 +147,13 @@ mod tests {
 
         let (width, height) = image.dimensions();
 
+        println!("Image dimensions: {}x{}", width, height);
+
         // Create ndarray
         let mut data = Array3::zeros((height as usize, width as usize, 3));
 
-        for (i, j, pixel) in image.pixels() {
-            let (i, j) = (i as usize, j as usize);
+        for (x, y, pixel) in image.pixels() {
+            let (i, j) = (y as usize, x as usize);
 
             for k in 0..3 {
                 data[[i, j, k]] = pixel[k];
@@ -111,6 +187,38 @@ mod tests {
                     data[[y, x, 0]] as u8,
                     data[[y, x, 1]] as u8,
                     data[[y, x, 2]] as u8,
+                ]);
+                output.put_pixel(x as u32, y as u32, pixel);
+            }
+        }
+
+        output.save(output_path).unwrap();
+
+        println!("Image saved");
+    }
+
+    #[test]
+    fn slic_test() {
+        let input_path = "./img/test_img.tif";
+        let output_path = "./img/test_img_slic.png";
+
+        let data = load_image_geotiff(input_path).unwrap();
+        // let data = load_image_tiff("./img/test_img_cropped.png").unwrap();
+
+        println!("Image loaded");
+
+        let labels = slic(data, 255, 10.0);
+
+        let (height, width, _channels) = labels.dim();
+
+        let mut output = image::ImageBuffer::new(width as u32, height as u32);
+
+        for y in 0..height {
+            for x in 0..width {
+                let pixel = image::Rgb([
+                    labels[[y, x, 0]] as u8,
+                    labels[[y, x, 1]] as u8,
+                    labels[[y, x, 2]] as u8,
                 ]);
                 output.put_pixel(x as u32, y as u32, pixel);
             }
