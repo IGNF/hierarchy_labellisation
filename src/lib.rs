@@ -1,8 +1,13 @@
-use std::io::Cursor;
+pub mod seed;
+pub mod slic;
+pub mod slic_helpers;
+
+use slic::slic_from_bytes;
+
+use simple_clustering::image::segment_contours;
 
 use ndarray::{s, Array3};
-
-use simple_clustering::{image::segment_contours, slic_from_bytes};
+use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -56,14 +61,8 @@ pub fn slic(img: Array3<u8>, n_clusters: usize, compactness: f32) -> Array3<u8> 
     )
     .expect_throw("SLIC failed");
 
-    segment_contours(
-        img_slice,
-        width as u32,
-        height as u32,
-        &clusters,
-        [0; 3],
-    )
-    .expect_throw("Failed to compute contours");
+    segment_contours(img_slice, width as u32, height as u32, &clusters, [0; 3])
+        .expect_throw("Failed to compute contours");
 
     img_array_std_layout.to_owned()
 }
