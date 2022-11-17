@@ -1,13 +1,13 @@
 use crate::seed::{init_seeds, perturb};
 use crate::slic_helpers::{
-    calculate_grid_interval, distance_lab, distance_s, distance_xy, get_in_bounds,
+    calculate_grid_interval, distance_pixel, distance_s, distance_xy, get_in_bounds,
     get_mut_in_bounds, m_div_s,
 };
 
 use simple_clustering::error::ScError;
 
+use ndarray::{s, Array1, Array3};
 use num_traits::ToPrimitive;
-use palette::{white_point::WhitePoint, FromColor, Lab, Pixel, Srgb};
 
 /// Information for tracking image pixels' nearest superpixel cluster and
 /// distance to that cluster during SLIC.
@@ -72,39 +72,6 @@ impl<T: Default> Default for SlicUpdate<T> {
     }
 }
 
-/// Calculate SLIC by providing a buffer of RGB component bytes as `&[u8]`.
-///
-/// `iter` will default to `10` if `None` is supplied.
-///
-/// `k` must not be `0`.
-/// `m` is clamped to be between `1` and `20`.
-/// `width` and `height` must not be `0`.
-pub fn slic_from_bytes(
-    k: u32,
-    m: u8,
-    width: u32,
-    height: u32,
-    iter: Option<u8>,
-    image: &[u8],
-) -> Result<Vec<usize>, ScError> {
-    if usize::try_from(u64::from(width) * u64::from(height))
-        .or(Err("Invalid image dimensions in SLIC from bytes"))?
-        != image.len() / 3
-    {
-        return Err(ScError::MismatchedSlicBuffer);
-    }
-    let input_buffer = Srgb::from_raw_slice(image);
-    let mut input_lab: Vec<Lab<_, f64>> = Vec::new();
-    input_lab.try_reserve_exact(input_buffer.len())?;
-    input_lab.extend(
-        input_buffer
-            .iter()
-            .map(|&c| Lab::from_color(c.into_format())),
-    );
-
-    slic(k, m, width, height, iter, &input_lab)
-}
-
 /// Calculate SLIC.
 ///
 /// `iter` will default to `10` if `None` is supplied.
@@ -122,17 +89,10 @@ pub fn slic_from_bytes(
 /// Superpixels Compared to State-of-the-art Superpixel Methods. IEEE Transactions
 /// on Pattern Analysis and Machine Intelligence, vol. 34, num. 11, p. 2274 – 2282,
 /// May 2012.*
-pub fn slic<Wp>(
-    k: u32,
-    m: u8,
-    width: u32,
-    height: u32,
-    iter: Option<u8>,
-    image: &[Lab<Wp, f64>],
-) -> Result<Vec<usize>, ScError>
-where
-    Wp: WhitePoint,
-{
+pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<usize>, ScError> {
+    let width = image.shape()[1] as u32;
+    let height = image.shape()[0] as u32;
+
     // Validate input parameters
     let m = m.clamp(1, 20);
     let iter = iter.unwrap_or(10);
@@ -164,10 +124,10 @@ where
 
     // Init seeds and shuffle them to a hopefully non-noisy pixel
     let mut clusters = Vec::new();
-    init_seeds(width, height, s, k, image, &mut clusters)?;
+    init_seeds(s, k, image, &mut clusters)?;
 
     for seed in &mut clusters {
-        perturb(seed, i64::from(width), i64::from(height), image)?;
+        perturb(seed, image)?;
     }
 
     // Bookkeeping for tracking pixel clusters and updating cluster centers
@@ -178,7 +138,7 @@ where
         .extend((0..image.len()).map(|_| f64::INFINITY));
     info.labels.extend((0..image.len()).map(|_| 0));
 
-    let mut updates: Vec<SlicUpdate<Lab<Wp, f64>>> = Vec::new();
+    let mut updates: Vec<SlicUpdate<Array1<f64>>> = Vec::new();
     updates.try_reserve_exact(clusters.len())?;
     updates.extend((0..clusters.len()).map(|_| SlicUpdate::new()));
 
@@ -194,11 +154,12 @@ where
                             .saturating_add(u64::from(x)),
                     )
                     .or(Err("Index out of bounds for finding new neighbors"))?;
-                    let color = *image.get(idx).ok_or("Image index out of bounds")?;
+
+                    let pixel = image.slice(s![y as i32, x as i32, ..]).to_owned();
 
                     let distance = distance_s(
                         m_s_term,
-                        distance_lab(color, center.data),
+                        distance_pixel(pixel, center.data.clone()),
                         distance_xy(
                             (f64::from(x), f64::from(y)),
                             (f64::from(center.x), f64::from(center.y)),
@@ -231,13 +192,17 @@ where
                 .or(Err("Invalid update index"))?;
 
                 if idx < image.len() && idx < info.labels.len() {
-                    let color = *image.get(idx).ok_or("Image index out of bounds")?;
+                    let pixel = image.slice(s![y as i32, x as i32, ..]).to_owned();
                     let index = *info
                         .labels
                         .get(idx)
                         .ok_or("Info update index out of bounds")?;
                     if let Some(update) = updates.get_mut(index) {
-                        update.data += color;
+                        if update.data.is_empty() {
+                            update.data = pixel.mapv(|e| e as f64)
+                        } else {
+                            update.data = update.data.clone() + pixel.mapv(|e| e as f64);
+                        }
                         update.x += f64::from(x);
                         update.y += f64::from(y);
                         update.count += 1.0;
@@ -252,7 +217,7 @@ where
             if update.count == 0.0 {
                 continue;
             }
-            center.data = update.data / update.count;
+            center.data = (update.data.clone() / update.count).mapv(|e| e as u8);
             center.x = (update.x / update.count)
                 .to_u32()
                 .ok_or("Update X out of bounds")?;

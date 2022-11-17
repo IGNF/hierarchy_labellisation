@@ -1,25 +1,23 @@
-use crate::slic_helpers::{distance_lab, div_ceil, get_in_bounds};
+use crate::slic_helpers::{distance_pixel, div_ceil, get_pixel};
 
+use ndarray::{s, Array1, Array3};
 use simple_clustering::error::{ScError, SeedErrorKind};
 use simple_clustering::Superpixel;
 
 use num_traits::ToPrimitive;
-use palette::{white_point::WhitePoint, FloatComponent, Lab};
 
 /// Initialize the superpixel seed centers.
 ///
 /// `width`, `height`, `s`, and `k` must not be `0`.
 pub fn init_seeds<T: Copy>(
-    width: u32,
-    height: u32,
     s: u32,
     k: u32,
-    image: &[T],
-    seeds: &mut Vec<Superpixel<T>>,
+    image: &Array3<T>,
+    seeds: &mut Vec<Superpixel<Array1<T>>>,
 ) -> Result<(), ScError> {
     seeds.clear();
-    let width = width;
-    let height = height;
+    let width = image.shape()[1] as u32;
+    let height = image.shape()[0] as u32;
     let s = s;
     let half_s = div_ceil(s, 2);
     let mut x_seeds = div_ceil(width, s);
@@ -83,9 +81,7 @@ pub fn init_seeds<T: Copy>(
             .or(Err(ScError::SeedError(SeedErrorKind::InvalidImageIndex)))?;
             if x < width && y < height && i < image.len() {
                 seeds.push(Superpixel {
-                    data: *image
-                        .get(i)
-                        .ok_or(ScError::SeedError(SeedErrorKind::InvalidImageIndex))?,
+                    data: image.slice(s![y as i32, x as i32, ..]).to_owned(),
                     x,
                     y,
                 });
@@ -99,20 +95,11 @@ pub fn init_seeds<T: Copy>(
 /// Find the lowest gradient in a 3x3 neighborhood for a seed.
 ///
 /// This step minimizes the chance that a noisy pixel is chosen as a seed.
-pub fn perturb<Wp, T>(
-    seed: &mut Superpixel<Lab<Wp, T>>,
-    width: i64,
-    height: i64,
-    image: &[Lab<Wp, T>],
-) -> Result<(), ScError>
-where
-    Wp: WhitePoint,
-    T: FloatComponent,
-{
-    let mut min = T::infinity();
-    let default = Lab::<Wp, T>::default();
-    let sp_x = i64::from(seed.x);
-    let sp_y = i64::from(seed.y);
+pub fn perturb(seed: &mut Superpixel<Array1<u8>>, image: &Array3<u8>) -> Result<(), ScError> {
+    let mut min = f64::INFINITY;
+    let default = Array1::<u8>::zeros(image.shape()[2]);
+    let sp_x = seed.x as i32;
+    let sp_y = seed.y as i32;
 
     // Gradient equation is
     // fn gradient() -> f64 {
@@ -121,12 +108,11 @@ where
     // }
     for ydx in -1..=1 {
         for xdx in -1..=1 {
-            let superpixel =
-                if let Some(color) = get_in_bounds(width, height, sp_x + xdx, sp_y + ydx, image) {
-                    (*color, sp_x + xdx, sp_y + ydx)
-                } else {
-                    continue;
-                };
+            let superpixel = if let Some(pixel) = get_pixel(sp_x + xdx, sp_y + ydx, &image) {
+                (pixel, sp_x + xdx, sp_y + ydx)
+            } else {
+                continue;
+            };
             let a_x = sp_x + xdx + 1;
             let b_x = sp_x + xdx - 1;
             let ab_y = sp_y + ydx;
@@ -134,12 +120,13 @@ where
             let c_y = sp_y + ydx + 1;
             let d_y = sp_y + ydx - 1;
 
-            let a = *get_in_bounds(width, height, a_x, ab_y, image).unwrap_or(&default);
-            let b = *get_in_bounds(width, height, b_x, ab_y, image).unwrap_or(&default);
-            let c = *get_in_bounds(width, height, cd_x, c_y, image).unwrap_or(&default);
-            let d = *get_in_bounds(width, height, cd_x, d_y, image).unwrap_or(&default);
+            let a = get_pixel(a_x, ab_y, &image).unwrap_or(default.clone());
+            let b = get_pixel(b_x, ab_y, &image).unwrap_or(default.clone());
+            let c = get_pixel(cd_x, c_y, &image).unwrap_or(default.clone());
+            let d = get_pixel(cd_x, d_y, &image).unwrap_or(default.clone());
 
-            let gradient = distance_lab(a, b) + distance_lab(c, d);
+            let gradient = distance_pixel(a, b) + distance_pixel(c, d);
+
             if gradient < min {
                 min = gradient;
                 seed.data = superpixel.0;

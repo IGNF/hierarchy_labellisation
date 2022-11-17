@@ -1,5 +1,5 @@
+use ndarray::{s, Array1, Array3};
 use num_traits::{Float, One, Unsigned, Zero};
-use palette::{white_point::WhitePoint, FloatComponent, Lab};
 use std::ops::{Add, Div, Rem};
 
 /// Calculate the superpixel side length, `S`.
@@ -12,14 +12,16 @@ pub fn calculate_grid_interval(width: u32, height: u32, superpixels: u32) -> f64
     ((f64::from(width) * f64::from(height)) / f64::from(superpixels)).sqrt()
 }
 
-/// Calculate the distance between two `Lab` colors.
+/// Calculate the distance between two pixels
 #[inline]
-pub fn distance_lab<Wp, T>(lhs: Lab<Wp, T>, rhs: Lab<Wp, T>) -> T
-where
-    Wp: WhitePoint,
-    T: FloatComponent,
-{
-    (rhs.l - lhs.l).powi(2) + (rhs.a - lhs.a).powi(2) + (rhs.b - lhs.b).powi(2)
+pub fn distance_pixel(lhs: Array1<u8>, rhs: Array1<u8>) -> f64 {
+    let mut sum = 0.0;
+    for i in 0..lhs.len() {
+        let diff = lhs[i] as f32 - rhs[i] as f32;
+        sum += diff * diff;
+    }
+
+    sum as f64
 }
 
 /// Calculate the distance between two two-dimensional points.
@@ -92,6 +94,16 @@ pub fn get_mut_in_bounds<T>(
             .checked_add(u64::try_from(x).ok()?)
             .and_then(|i| usize::try_from(i).ok())?;
         image.get_mut(i)
+    } else {
+        None
+    }
+}
+
+/// Checks if the index is in bounds and returns the pixel data at that point if it exists.
+#[inline]
+pub fn get_pixel(x: i32, y: i32, image: &Array3<u8>) -> Option<Array1<u8>> {
+    if (0..(image.shape()[0] as i32)).contains(&y) && (0..(image.shape()[1] as i32)).contains(&x) {
+        Some(image.slice(s![y, x, ..]).to_owned())
     } else {
         None
     }

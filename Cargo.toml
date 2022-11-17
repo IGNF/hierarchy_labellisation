@@ -16,3 +16,7 @@ num-traits = "0.2.15"
 palette = "0.6.1"
 simple_clustering = "0.1.0"
 wasm-bindgen = "0.2"
+
+[dependencies.web-sys]
+version = "0.3.60"
+features = ["console"]

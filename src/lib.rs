@@ -2,13 +2,12 @@ pub mod seed;
 pub mod slic;
 pub mod slic_helpers;
 
-use slic::slic_from_bytes;
-
 use simple_clustering::image::segment_contours;
 
-use ndarray::{s, Array3};
+use ndarray::Array3;
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 #[wasm_bindgen]
 pub fn add(left: usize, right: usize) -> usize {
@@ -42,26 +41,24 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
     buffer.into_boxed_slice()
 }
 
-pub fn slic(img: Array3<u8>, n_clusters: usize, compactness: f32) -> Array3<u8> {
+pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8> {
     let (height, width, _channels) = img.dim();
 
-    let img_array_sliced = img.slice(s![.., .., ..3usize]).to_owned();
-    let mut img_array_std_layout = img_array_sliced.as_standard_layout();
+    console::debug_1(&format!("{:?}", img.dim()).into());
+
+    let mut img_array_std_layout = img.as_standard_layout();
+    let img_as_array3 = img_array_std_layout.to_owned();
+
     let img_slice = img_array_std_layout
         .as_slice_mut()
         .expect_throw("Fail to convert to slice");
 
-    let clusters = slic_from_bytes(
-        n_clusters as u32,
-        1,
-        width as u32,
-        height as u32,
-        Some(10),
-        img_slice,
-    )
-    .expect_throw("SLIC failed");
+    let labels =
+        slic::slic(n_clusters as u32, 1, Some(10), &img_as_array3).expect_throw("SLIC failed");
 
-    segment_contours(img_slice, width as u32, height as u32, &clusters, [0; 3])
+    console::debug_1(&format!("{:?}", labels).into());
+
+    segment_contours(img_slice, width as u32, height as u32, &labels, [0; 3])
         .expect_throw("Failed to compute contours");
 
     img_array_std_layout.to_owned()
