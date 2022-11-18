@@ -44,7 +44,7 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
 pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8> {
     let (height, width, _channels) = img.dim();
 
-    console::debug_1(&format!("{:?}", img.dim()).into());
+    console::debug_1(&format!("Dimensions: {:?}", img.dim()).into());
 
     let mut img_array_std_layout = img.as_standard_layout();
     let img_as_array3 = img_array_std_layout.to_owned();

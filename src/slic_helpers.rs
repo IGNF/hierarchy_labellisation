@@ -1,4 +1,4 @@
-use ndarray::{s, Array1, Array3};
+use ndarray::{s, Array3, ArrayView1};
 use num_traits::{Float, One, Unsigned, Zero};
 use std::ops::{Add, Div, Rem};
 
@@ -14,7 +14,7 @@ pub fn calculate_grid_interval(width: u32, height: u32, superpixels: u32) -> f64
 
 /// Calculate the distance between two pixels
 #[inline]
-pub fn distance_pixel(lhs: Array1<u8>, rhs: Array1<u8>) -> f64 {
+pub fn distance_pixel(lhs: ArrayView1<u8>, rhs: ArrayView1<u8>) -> f64 {
     let mut sum = 0.0;
     for i in 0..lhs.len() {
         let diff = lhs[i] as f32 - rhs[i] as f32;
@@ -101,9 +101,9 @@ pub fn get_mut_in_bounds<T>(
 
 /// Checks if the index is in bounds and returns the pixel data at that point if it exists.
 #[inline]
-pub fn get_pixel(x: i32, y: i32, image: &Array3<u8>) -> Option<Array1<u8>> {
+pub fn get_pixel(x: i32, y: i32, image: &Array3<u8>) -> Option<ArrayView1<u8>> {
     if (0..(image.shape()[0] as i32)).contains(&y) && (0..(image.shape()[1] as i32)).contains(&x) {
-        Some(image.slice(s![y, x, ..]).to_owned())
+        Some(image.slice(s![y, x, ..]))
     } else {
         None
     }

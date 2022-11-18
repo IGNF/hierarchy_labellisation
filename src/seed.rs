@@ -120,16 +120,16 @@ pub fn perturb(seed: &mut Superpixel<Array1<u8>>, image: &Array3<u8>) -> Result<
             let c_y = sp_y + ydx + 1;
             let d_y = sp_y + ydx - 1;
 
-            let a = get_pixel(a_x, ab_y, &image).unwrap_or(default.clone());
-            let b = get_pixel(b_x, ab_y, &image).unwrap_or(default.clone());
-            let c = get_pixel(cd_x, c_y, &image).unwrap_or(default.clone());
-            let d = get_pixel(cd_x, d_y, &image).unwrap_or(default.clone());
+            let a = get_pixel(a_x, ab_y, &image).unwrap_or(default.view());
+            let b = get_pixel(b_x, ab_y, &image).unwrap_or(default.view());
+            let c = get_pixel(cd_x, c_y, &image).unwrap_or(default.view());
+            let d = get_pixel(cd_x, d_y, &image).unwrap_or(default.view());
 
             let gradient = distance_pixel(a, b) + distance_pixel(c, d);
 
             if gradient < min {
                 min = gradient;
-                seed.data = superpixel.0;
+                seed.data = superpixel.0.to_owned();
                 seed.x = u32::try_from(superpixel.1)
                     .or(Err(ScError::SeedError(SeedErrorKind::PerturbConversion)))?;
                 seed.y = u32::try_from(superpixel.2)

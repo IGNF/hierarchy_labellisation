@@ -155,11 +155,11 @@ pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<u
                     )
                     .or(Err("Index out of bounds for finding new neighbors"))?;
 
-                    let pixel = image.slice(s![y as i32, x as i32, ..]).to_owned();
+                    let pixel = image.slice(s![y as i32, x as i32, ..]);
 
                     let distance = distance_s(
                         m_s_term,
-                        distance_pixel(pixel, center.data.clone()),
+                        distance_pixel(pixel, center.data.view()),
                         distance_xy(
                             (f64::from(x), f64::from(y)),
                             (f64::from(center.x), f64::from(center.y)),
