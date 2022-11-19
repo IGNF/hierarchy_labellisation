@@ -92,6 +92,7 @@ impl<T: Default> Default for SlicUpdate<T> {
 pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<usize>, ScError> {
     let width = image.shape()[1] as u32;
     let height = image.shape()[0] as u32;
+    let size = (width * height) as usize;
 
     // Validate input parameters
     let m = m.clamp(1, 20);
@@ -132,11 +133,10 @@ pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<u
 
     // Bookkeeping for tracking pixel clusters and updating cluster centers
     let mut info = SlicInfo::<f64, usize>::new();
-    info.distances.try_reserve_exact(image.len())?;
-    info.labels.try_reserve_exact(image.len())?;
-    info.distances
-        .extend((0..image.len()).map(|_| f64::INFINITY));
-    info.labels.extend((0..image.len()).map(|_| 0));
+    info.distances.try_reserve_exact(size)?;
+    info.labels.try_reserve_exact(size)?;
+    info.distances.extend((0..size).map(|_| f64::INFINITY));
+    info.labels.extend((0..size).map(|_| 0));
 
     let mut updates: Vec<SlicUpdate<Array1<f64>>> = Vec::new();
     updates.try_reserve_exact(clusters.len())?;

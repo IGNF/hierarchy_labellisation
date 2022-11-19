@@ -4,7 +4,7 @@ pub mod slic_helpers;
 
 use simple_clustering::image::segment_contours;
 
-use ndarray::Array3;
+use ndarray::{s, Array3};
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -46,22 +46,24 @@ pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8>
 
     console::debug_1(&format!("Dimensions: {:?}", img.dim()).into());
 
-    let mut img_array_std_layout = img.as_standard_layout();
-    let img_as_array3 = img_array_std_layout.to_owned();
-
-    let img_slice = img_array_std_layout
-        .as_slice_mut()
-        .expect_throw("Fail to convert to slice");
+    let img_as_array3 = img.as_standard_layout().to_owned();
 
     let labels =
         slic::slic(n_clusters as u32, 1, Some(10), &img_as_array3).expect_throw("SLIC failed");
 
     console::debug_1(&format!("{:?}", labels).into());
 
-    segment_contours(img_slice, width as u32, height as u32, &labels, [0; 3])
+    // Only take the first 3 channels to visualize the segmentation
+    let img_visu = img.slice(s![.., .., ..3usize]).to_owned();
+    let mut img_visu_std = img_visu.as_standard_layout();
+    let img_visu_slice = img_visu_std
+        .as_slice_mut()
+        .expect_throw("Fail to convert to slice");
+
+    segment_contours(img_visu_slice, width as u32, height as u32, &labels, [0; 3])
         .expect_throw("Failed to compute contours");
 
-    img_array_std_layout.to_owned()
+    img_visu_std.to_owned()
 }
 
 #[wasm_bindgen]
