@@ -1,7 +1,10 @@
 pub mod seed;
 pub mod slic;
 pub mod slic_helpers;
+mod graph;
 
+use graph::graph_from_labels;
+use petgraph::{graph::NodeIndex, prelude::UnGraph};
 use simple_clustering::image::segment_contours;
 
 use ndarray::{s, Array3};
@@ -66,6 +69,29 @@ pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8>
     img_visu_std.to_owned()
 }
 
+pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) {
+    let (height, width, _channels) = img.dim();
+
+    let labels = slic::slic(n_clusters as u32, 1, Some(10), &img).expect_throw("SLIC failed");
+
+    let labels_array_2 = ndarray::Array2::from_shape_vec(
+        (height, width),
+        labels.iter().map(|x| *x as usize).collect(),
+    )
+    .unwrap();
+
+    let graph = graph_from_labels(img, labels_array_2);
+
+    console::log_1(
+        &format!(
+            "nodes: {},  edges: {}",
+            graph.node_count(),
+            graph.edge_count()
+        )
+        .into(),
+    );
+}
+
 #[wasm_bindgen]
 pub fn slic_from_js(
     data: &[u8],
@@ -103,6 +129,23 @@ pub fn slic_from_js(
         .expect_throw("Failed to write to png");
 
     buffer.into_boxed_slice()
+}
+
+#[wasm_bindgen]
+pub fn hierarchical_segmentation_from_js(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    channels: usize,
+    n_clusters: usize,
+) {
+    let mut array = Array3::from_shape_vec((channels, height, width), data.to_vec())
+        .expect_throw("Data doesn't have the right shape");
+
+    array.swap_axes(0, 1);
+    array.swap_axes(1, 2);
+
+    hierarchical_segmentation(array, n_clusters);
 }
 
 #[cfg(test)]
