@@ -1,21 +1,15 @@
+mod graph;
+mod logger;
 pub mod seed;
 pub mod slic;
 pub mod slic_helpers;
-mod graph;
 
 use graph::graph_from_labels;
-use petgraph::{graph::NodeIndex, prelude::UnGraph};
 use simple_clustering::image::segment_contours;
 
 use ndarray::{s, Array3};
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
-
-#[wasm_bindgen]
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
 
 #[wasm_bindgen]
 pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize) -> Box<[u8]> {
@@ -47,14 +41,14 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
 pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8> {
     let (height, width, _channels) = img.dim();
 
-    console::debug_1(&format!("Dimensions: {:?}", img.dim()).into());
+    console_log!("Dimensions: {:?}", img.dim());
 
     let img_as_array3 = img.as_standard_layout().to_owned();
 
     let labels =
         slic::slic(n_clusters as u32, 1, Some(10), &img_as_array3).expect_throw("SLIC failed");
 
-    console::debug_1(&format!("{:?}", labels).into());
+    console_log!("Labels: {:?}", labels);
 
     // Only take the first 3 channels to visualize the segmentation
     let img_visu = img.slice(s![.., .., ..3usize]).to_owned();
@@ -72,6 +66,8 @@ pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8>
 pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) {
     let (height, width, _channels) = img.dim();
 
+    console_log!("Sarting slic");
+
     let labels = slic::slic(n_clusters as u32, 1, Some(10), &img).expect_throw("SLIC failed");
 
     let labels_array_2 = ndarray::Array2::from_shape_vec(
@@ -80,15 +76,14 @@ pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) {
     )
     .unwrap();
 
+    console_log!("slic done");
+
     let graph = graph_from_labels(img, labels_array_2);
 
-    console::log_1(
-        &format!(
-            "nodes: {},  edges: {}",
-            graph.node_count(),
-            graph.edge_count()
-        )
-        .into(),
+    console_log!(
+        "nodes: {},  edges: {}",
+        graph.node_count(),
+        graph.edge_count()
     );
 }
 
@@ -155,12 +150,6 @@ mod tests {
     use image::{GenericImageView, ImageResult};
 
     use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 
     fn load_image_geotiff(path: &str) -> Result<Array3<u8>> {
         let image = geotiff::TIFF::open(path)?;

@@ -1,7 +1,5 @@
-import { add, convert_to_png, hierarchical_segmentation_from_js, slic_from_js } from 'hierarchy_labellisation';
+import { convert_to_png, hierarchical_segmentation_from_js, slic_from_js } from 'hierarchy_labellisation';
 import { fromArrayBuffer, TypedArray } from 'geotiff';
-
-console.log(add(1, 2));
 
 function setupFileInput() {
     const fileSelector = document.getElementById('file-selector') as HTMLInputElement;

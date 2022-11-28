@@ -1,5 +1,3 @@
-use std::ops::Add;
-
 use ndarray::{s, Array1, Array2, Array3};
 use petgraph::{adj::NodeIndex, prelude::UnGraph};
 
@@ -42,7 +40,7 @@ pub fn graph_from_labels(
     img: Array3<u8>,
     labels: Array2<usize>,
 ) -> UnGraph<SuperpixelNode, SuperpixelEdge> {
-    let (height, width, channels) = img.dim();
+    let (_height, _width, channels) = img.dim();
     let num_vertex = *labels.iter().max().unwrap() + 1;
 
     let mut graph = UnGraph::<SuperpixelNode, SuperpixelEdge>::new_undirected();
@@ -98,19 +96,12 @@ mod tests {
 
     #[test]
     fn test_graph_from_labels() {
-        let img = Array3::from_shape_vec(
-            (3, 3, 3),
-            vec![
-                0, 1, 2, 3, 4, 5, 6, 7, 8, //
-                9, 10, 11, 12, 13, 14, 15, 16, 17, //
-                18, 19, 20, 21, 22, 23, 24, 25, 26, //
-            ],
-        )
-        .unwrap();
         // 0 0 1
         // 0 0 1
         // 2 2 2
         let labels = Array2::from_shape_vec((3, 3), vec![0, 0, 1, 0, 0, 1, 2, 2, 2]).unwrap();
+        // Pixel values are from 0 to 27 (3 channels)
+        let img = Array3::from_shape_vec((3, 3, 3), (0..27).into_iter().collect()).unwrap();
 
         let graph = graph_from_labels(img, labels);
 
