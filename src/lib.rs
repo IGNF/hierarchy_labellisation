@@ -4,6 +4,7 @@ mod seed;
 mod slic;
 mod slic_helpers;
 mod utils;
+mod plef;
 
 use graph::graph_from_labels;
 
