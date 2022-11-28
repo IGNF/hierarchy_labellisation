@@ -37,8 +37,8 @@ impl SuperpixelEdge {
 }
 
 pub fn graph_from_labels(
-    img: Array3<u8>,
-    labels: Array2<usize>,
+    img: &Array3<u8>,
+    labels: &Array2<usize>,
 ) -> UnGraph<SuperpixelNode, SuperpixelEdge> {
     let (_height, _width, channels) = img.dim();
     let num_vertex = *labels.iter().max().unwrap() + 1;
@@ -85,7 +85,7 @@ pub fn graph_from_labels(
         }
     }
 
-    return graph;
+    graph
 }
 
 #[cfg(test)]
@@ -103,7 +103,7 @@ mod tests {
         // Pixel values are from 0 to 27 (3 channels)
         let img = Array3::from_shape_vec((3, 3, 3), (0..27).into_iter().collect()).unwrap();
 
-        let graph = graph_from_labels(img, labels);
+        let graph = graph_from_labels(&img, &labels);
 
         assert_eq!(graph.node_count(), 3);
 

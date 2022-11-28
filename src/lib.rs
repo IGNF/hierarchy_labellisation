@@ -1,33 +1,26 @@
 mod graph;
 mod logger;
-pub mod seed;
-pub mod slic;
-pub mod slic_helpers;
+mod seed;
+mod slic;
+mod slic_helpers;
+mod utils;
 
 use graph::graph_from_labels;
-use simple_clustering::image::segment_contours;
 
-use ndarray::{s, Array3};
+use crate::slic::slic;
+use ndarray::Array3;
 use std::io::Cursor;
+use utils::array_to_image;
 use wasm_bindgen::prelude::*;
+
+use crate::utils::{array_to_png, draw_segments};
 
 #[wasm_bindgen]
 pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize) -> Box<[u8]> {
     let array = Array3::from_shape_vec((channels, height, width), data.to_vec())
         .expect_throw("Data doesn't have the right shape");
 
-    let mut output = image::ImageBuffer::new(width as u32, height as u32);
-
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = image::Rgb([
-                array[[0, y, x]] as u8,
-                array[[1, y, x]] as u8,
-                array[[2, y, x]] as u8,
-            ]);
-            output.put_pixel(x as u32, y as u32, pixel);
-        }
-    }
+    let output = array_to_image(array.view());
 
     // Convert to png and return
     let mut buffer = Vec::new();
@@ -38,53 +31,23 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
     buffer.into_boxed_slice()
 }
 
-pub fn slic(img: Array3<u8>, n_clusters: usize, _compactness: f32) -> Array3<u8> {
-    let (height, width, _channels) = img.dim();
-
-    console_log!("Dimensions: {:?}", img.dim());
-
-    let img_as_array3 = img.as_standard_layout().to_owned();
-
-    let labels =
-        slic::slic(n_clusters as u32, 1, Some(10), &img_as_array3).expect_throw("SLIC failed");
-
-    console_log!("Labels: {:?}", labels);
-
-    // Only take the first 3 channels to visualize the segmentation
-    let img_visu = img.slice(s![.., .., ..3usize]).to_owned();
-    let mut img_visu_std = img_visu.as_standard_layout();
-    let img_visu_slice = img_visu_std
-        .as_slice_mut()
-        .expect_throw("Fail to convert to slice");
-
-    segment_contours(img_visu_slice, width as u32, height as u32, &labels, [0; 3])
-        .expect_throw("Failed to compute contours");
-
-    img_visu_std.to_owned()
-}
-
-pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) {
-    let (height, width, _channels) = img.dim();
-
-    console_log!("Sarting slic");
-
-    let labels = slic::slic(n_clusters as u32, 1, Some(10), &img).expect_throw("SLIC failed");
-
-    let labels_array_2 = ndarray::Array2::from_shape_vec(
-        (height, width),
-        labels.iter().map(|x| *x as usize).collect(),
-    )
-    .unwrap();
+pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) -> Array3<u8> {
+    console_log!("starting slic");
+    let labels = slic(n_clusters as u32, 1, Some(10), &img).expect_throw("SLIC failed");
 
     console_log!("slic done");
 
-    let graph = graph_from_labels(img, labels_array_2);
+    let graph = graph_from_labels(&img, &labels);
 
     console_log!(
         "nodes: {},  edges: {}",
         graph.node_count(),
         graph.edge_count()
     );
+
+    let segmented_img = draw_segments(&img, labels);
+
+    segmented_img
 }
 
 #[wasm_bindgen]
@@ -94,7 +57,7 @@ pub fn slic_from_js(
     height: usize,
     channels: usize,
     n_clusters: usize,
-    compactness: f32,
+    _compactness: f32,
 ) -> Box<[u8]> {
     let mut array = Array3::from_shape_vec((channels, height, width), data.to_vec())
         .expect_throw("Data doesn't have the right shape");
@@ -102,27 +65,13 @@ pub fn slic_from_js(
     array.swap_axes(0, 1);
     array.swap_axes(1, 2);
 
-    let labels = slic(array, n_clusters, compactness);
+    console_log!("Dimensions: {:?}", array.dim());
 
-    let mut output = image::ImageBuffer::new(width as u32, height as u32);
+    let labels = slic::slic(n_clusters as u32, 1, Some(10), &array).expect_throw("SLIC failed");
 
-    for y in 0..height {
-        for x in 0..width {
-            let pixel = image::Rgb([
-                labels[[y, x, 0]] as u8,
-                labels[[y, x, 1]] as u8,
-                labels[[y, x, 2]] as u8,
-            ]);
-            output.put_pixel(x as u32, y as u32, pixel);
-        }
-    }
+    let segmented_img = draw_segments(&array, labels);
 
-    // Convert to png and return
-    let mut buffer = Vec::new();
-    output
-        .write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png)
-        .expect_throw("Failed to write to png");
-
+    let buffer = array_to_png(segmented_img.view());
     buffer.into_boxed_slice()
 }
 
@@ -133,14 +82,18 @@ pub fn hierarchical_segmentation_from_js(
     height: usize,
     channels: usize,
     n_clusters: usize,
-) {
+) -> Box<[u8]> {
     let mut array = Array3::from_shape_vec((channels, height, width), data.to_vec())
         .expect_throw("Data doesn't have the right shape");
 
     array.swap_axes(0, 1);
     array.swap_axes(1, 2);
 
-    hierarchical_segmentation(array, n_clusters);
+    let img = hierarchical_segmentation(array, n_clusters);
+
+    let buffer = array_to_png(img.view());
+
+    buffer.into_boxed_slice()
 }
 
 #[cfg(test)]
@@ -209,18 +162,7 @@ mod tests {
             height, width, channels
         );
 
-        let mut output = image::ImageBuffer::new(width as u32, height as u32);
-
-        for y in 0..height {
-            for x in 0..width {
-                let pixel = image::Rgb([
-                    data[[y, x, 0]] as u8,
-                    data[[y, x, 1]] as u8,
-                    data[[y, x, 2]] as u8,
-                ]);
-                output.put_pixel(x as u32, y as u32, pixel);
-            }
-        }
+        let output = array_to_image(data.view());
 
         output.save(output_path).unwrap();
 
@@ -237,7 +179,17 @@ mod tests {
 
         println!("Image loaded");
 
-        let labels = slic(data, 255, 10.0);
+        let labels = {
+            let img = data;
+            let _compactness = 10.0;
+            console_log!("Dimensions: {:?}", img.dim());
+
+            let labels = slic::slic(255 as u32, 1, Some(10), &img).expect_throw("SLIC failed");
+
+            let segmented_img = draw_segments(&img, labels);
+
+            segmented_img
+        };
 
         let (height, width, _channels) = labels.dim();
 

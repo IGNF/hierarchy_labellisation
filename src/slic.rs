@@ -6,7 +6,7 @@ use crate::slic_helpers::{
 
 use simple_clustering::error::ScError;
 
-use ndarray::{s, Array1, Array3};
+use ndarray::{s, Array1, Array3, Array2};
 use num_traits::ToPrimitive;
 
 /// Information for tracking image pixels' nearest superpixel cluster and
@@ -89,7 +89,7 @@ impl<T: Default> Default for SlicUpdate<T> {
 /// Superpixels Compared to State-of-the-art Superpixel Methods. IEEE Transactions
 /// on Pattern Analysis and Machine Intelligence, vol. 34, num. 11, p. 2274 – 2282,
 /// May 2012.*
-pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<usize>, ScError> {
+pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Array2<usize>, ScError> {
     let width = image.shape()[1] as u32;
     let height = image.shape()[0] as u32;
     let size = (width * height) as usize;
@@ -192,7 +192,7 @@ pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<u
                 .or(Err("Invalid update index"))?;
 
                 if idx < image.len() && idx < info.labels.len() {
-                    let pixel = image.slice(s![y as i32, x as i32, ..]).to_owned();
+                    let pixel = image.slice(s![y as i32, x as i32, ..]);
                     let index = *info
                         .labels
                         .get(idx)
@@ -201,7 +201,7 @@ pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<u
                         if update.data.is_empty() {
                             update.data = pixel.mapv(|e| e as f64)
                         } else {
-                            update.data = update.data.clone() + pixel.mapv(|e| e as f64);
+                            update.data = pixel.mapv(|e| e as f64) + &update.data;
                         }
                         update.x += f64::from(x);
                         update.y += f64::from(y);
@@ -230,7 +230,13 @@ pub fn slic(k: u32, m: u8, iter: Option<u8>, image: &Array3<u8>) -> Result<Vec<u
 
     enforce_connectivity(width, height, s, &mut info.labels)?;
 
-    Ok(info.labels)
+    let res = Array2::from_shape_vec(
+        (height as usize, width as usize),
+        info.labels.iter().map(|x| *x as usize).collect(),
+    )
+    .unwrap();
+
+    Ok(res)
 }
 
 // Relabel disjoint labels to the largest, nearest neighbor cluster.

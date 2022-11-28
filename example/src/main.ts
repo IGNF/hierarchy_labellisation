@@ -51,25 +51,29 @@ async function readTiff(buffer: ArrayBuffer) {
     }
 }
 
+function createImageElement(data: Uint8Array): HTMLImageElement {
+    const blob = new Blob([data], { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.width = 600;
+    return img;
+}
+
 async function processTiff(buffer: ArrayBuffer) {
     const tiff = await readTiff(buffer);
 
     console.log(tiff);
 
-    hierarchical_segmentation_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 1000);
-
-    console.log('after');
+    // hierarchical_segmentation_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 1000);
     
-    // const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 10000, 10);
+    const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 10000, 10);
+    const app = document.getElementById('app')!;
+    const img = createImageElement(result);
+    app.appendChild(img);
 
-    // const blob = new Blob([result], { type: 'image/png' });
-    // const url = URL.createObjectURL(blob);
-
-    // const img = document.createElement('img');
-    // img.src = url;
-    // img.width = 600;
-    // const app = document.getElementById('app')!;
-    // app.appendChild(img);
+    console.log('Done')
 }
 
 setupFileInput();

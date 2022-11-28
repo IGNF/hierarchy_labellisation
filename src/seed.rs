@@ -108,7 +108,7 @@ pub fn perturb(seed: &mut Superpixel<Array1<u8>>, image: &Array3<u8>) -> Result<
     // }
     for ydx in -1..=1 {
         for xdx in -1..=1 {
-            let superpixel = if let Some(pixel) = get_pixel(sp_x + xdx, sp_y + ydx, &image) {
+            let superpixel = if let Some(pixel) = get_pixel(sp_x + xdx, sp_y + ydx, image) {
                 (pixel, sp_x + xdx, sp_y + ydx)
             } else {
                 continue;
@@ -120,10 +120,10 @@ pub fn perturb(seed: &mut Superpixel<Array1<u8>>, image: &Array3<u8>) -> Result<
             let c_y = sp_y + ydx + 1;
             let d_y = sp_y + ydx - 1;
 
-            let a = get_pixel(a_x, ab_y, &image).unwrap_or(default.view());
-            let b = get_pixel(b_x, ab_y, &image).unwrap_or(default.view());
-            let c = get_pixel(cd_x, c_y, &image).unwrap_or(default.view());
-            let d = get_pixel(cd_x, d_y, &image).unwrap_or(default.view());
+            let a = get_pixel(a_x, ab_y, image).unwrap_or_else(|| default.view());
+            let b = get_pixel(b_x, ab_y, image).unwrap_or_else(|| default.view());
+            let c = get_pixel(cd_x, c_y, image).unwrap_or_else(|| default.view());
+            let d = get_pixel(cd_x, d_y, image).unwrap_or_else(|| default.view());
 
             let gradient = distance_pixel(a, b) + distance_pixel(c, d);
 
