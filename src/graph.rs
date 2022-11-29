@@ -3,6 +3,8 @@ use petgraph::{graph::NodeIndex, prelude::UnGraph};
 
 use crate::plef::{Plef, PlefPiece};
 
+type SuperpixelGraph = UnGraph<SuperpixelNode, SuperpixelEdge>;
+
 pub struct SuperpixelNode {
     area: u32,                 // number of pixels in the superpixel
     perimeter: u32,            // perimiter of the superpixel
@@ -40,12 +42,12 @@ impl SuperpixelNode {
 }
 
 pub struct SuperpixelEdge {
-    weight: f32,
+    weight: f64,
     length: u32,
 }
 
 impl SuperpixelEdge {
-    fn new(weight: f32, length: u32) -> Self {
+    fn new(weight: f64, length: u32) -> Self {
         Self { weight, length }
     }
 
@@ -54,14 +56,33 @@ impl SuperpixelEdge {
     }
 }
 
-pub fn graph_from_labels(
-    img: &Array3<u8>,
-    labels: &Array2<usize>,
-) -> UnGraph<SuperpixelNode, SuperpixelEdge> {
+pub fn apparition_scale(
+    edge: &SuperpixelEdge,
+    source: &SuperpixelNode,
+    target: &SuperpixelNode,
+) -> f64 {
+    let mut e = source.optimal_energy.sum(&target.optimal_energy, None);
+
+    let mean = &source.values + &target.values;
+    let mean2 = &source.values_sq + &target.values_sq;
+    let a = &source.area + &target.area;
+
+    let data_fidelity = mean2.mapv(f64::from) - (&mean * &mean).mapv(f64::from) / a as f64;
+
+    let merge_perimeter = &source.perimeter + &target.perimeter - 2 * edge.length;
+
+    e.infimum(PlefPiece {
+        start_x: 0.0,
+        start_y: data_fidelity.sum(),
+        slope: merge_perimeter as f64,
+    })
+}
+
+pub fn graph_from_labels(img: &Array3<u8>, labels: &Array2<usize>) -> SuperpixelGraph {
     let (height, width, channels) = img.dim();
     let num_vertex = *labels.iter().max().unwrap() + 1;
 
-    let mut graph = UnGraph::<SuperpixelNode, SuperpixelEdge>::new_undirected();
+    let mut graph = SuperpixelGraph::new_undirected();
     for _ in 0..num_vertex {
         graph.add_node(SuperpixelNode::init(channels));
     }
@@ -108,18 +129,28 @@ pub fn graph_from_labels(
         graph[NodeIndex::from(labels[[0, x]] as u32)].perimeter += 1;
         graph[NodeIndex::from(labels[[height - 1, x]] as u32)].perimeter += 1;
     }
-
     for y in 0..height {
         graph[NodeIndex::from(labels[[y, 0]] as u32)].perimeter += 1;
         graph[NodeIndex::from(labels[[y, width - 1]] as u32)].perimeter += 1;
     }
 
+    // Initialize optimal energy
     for node in graph.node_weights_mut() {
         let data_fidelity = &node.values_sq - &node.values.mapv(|x| x * x) / node.area;
         let data_fidelity = data_fidelity.sum() as f64;
 
         let plef = Plef::from(PlefPiece::new(0., data_fidelity, node.perimeter as f64));
         node.optimal_energy = plef;
+    }
+
+    for edge_i in graph.edge_indices() {
+        let (s_i, t_i) = graph.edge_endpoints(edge_i).unwrap();
+
+        let s_node = &graph[s_i];
+        let t_node = &graph[t_i];
+        let edge = &graph[edge_i];
+
+        graph[edge_i].weight = apparition_scale(&edge, &s_node, &t_node);
     }
 
     graph

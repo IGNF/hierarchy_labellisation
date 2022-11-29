@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use num_traits::Float;
 
+#[derive(Clone)]
 pub struct PlefPiece<T: Float> {
     pub start_x: T,
     pub start_y: T,
@@ -25,6 +26,7 @@ impl<T: Float> PlefPiece<T> {
 /// A Plef is a piecewise linear energy function.
 /// It is used by the Mumford-Shah algorithm to compute the optimal segmentation.
 /// It contains a set of pieces which are linear functions. It is concave.
+#[derive(Clone)]
 pub(crate) struct Plef<T: Float> {
     pub pieces: VecDeque<PlefPiece<T>>,
 }
@@ -36,12 +38,14 @@ impl<T: Float> Plef<T> {
         }
     }
 
-    fn sum(self, other: Self, max_pieces: u32) -> Self {
+    pub fn sum(&self, other: &Self, max_pieces: Option<u32>) -> Self {
         if other.pieces.is_empty() {
-            return self;
+            return self.clone();
         } else if self.pieces.is_empty() {
-            return other;
+            return other.clone();
         }
+
+        let max_p = max_pieces.unwrap_or(10);
 
         let mut res = Self::init();
 
@@ -50,7 +54,7 @@ impl<T: Float> Plef<T> {
 
         let mut count = 0;
 
-        while i.peek().is_some() && j.peek().is_some() && count < max_pieces {
+        while i.peek().is_some() && j.peek().is_some() && count < max_p {
             let piece_i = i.peek().unwrap();
             let piece_j = j.peek().unwrap();
 
