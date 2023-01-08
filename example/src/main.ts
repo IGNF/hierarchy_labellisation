@@ -66,9 +66,9 @@ async function processTiff(buffer: ArrayBuffer) {
 
     console.log(tiff);
 
-    // hierarchical_segmentation_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 1000);
+    const result = hierarchical_segmentation_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 1000);
     
-    const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 10000, 10);
+    // const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 10000, 10);
     const app = document.getElementById('app')!;
     const img = createImageElement(result);
     app.appendChild(img);

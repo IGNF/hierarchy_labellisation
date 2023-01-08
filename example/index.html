@@ -4,11 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Example</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="app">
       <input type="file" id="file-selector">
       <br>
+      <br>
+      <div class="slidecontainer">
+        <input type="range" min="1" max="100" value="1" class="slider" id="myRange">
+      </div>
       <br>
     </div>
     <script type="module" src="/src/main.ts"></script>
