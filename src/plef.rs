@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use num_traits::Float;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PlefPiece<T: Float> {
     pub start_x: T,
     pub start_y: T,
@@ -26,8 +26,8 @@ impl<T: Float> PlefPiece<T> {
 /// A Plef is a piecewise linear energy function.
 /// It is used by the Mumford-Shah algorithm to compute the optimal segmentation.
 /// It contains a set of pieces which are linear functions. It is concave.
-#[derive(Clone)]
-pub(crate) struct Plef<T: Float> {
+#[derive(Debug, Clone)]
+pub struct Plef<T: Float> {
     pub pieces: VecDeque<PlefPiece<T>>,
 }
 

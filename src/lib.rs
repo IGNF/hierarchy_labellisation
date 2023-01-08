@@ -5,10 +5,11 @@ mod slic;
 mod slic_helpers;
 mod utils;
 mod plef;
+mod hierarchy;
 
 use graph::graph_from_labels;
 
-use crate::slic::slic;
+use crate::{slic::slic, hierarchy::binary_partition_tree};
 use ndarray::Array3;
 use std::io::Cursor;
 use utils::array_to_image;
@@ -33,18 +34,21 @@ pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize)
 }
 
 pub fn hierarchical_segmentation(img: Array3<u8>, n_clusters: usize) -> Array3<u8> {
-    console_log!("starting slic");
-    let labels = slic(n_clusters as u32, 1, Some(10), &img).expect_throw("SLIC failed");
+    console_log!("Starting slic");
+    let labels = slic(n_clusters as u32, 1, Some(3), &img).expect_throw("SLIC failed");
 
-    console_log!("slic done");
+    console_log!("Slic done");
+    console_log!("Creating graph from segmentation...");
 
-    let graph = graph_from_labels(&img, &labels);
+    let mut graph = graph_from_labels(&img, &labels);
 
     console_log!(
-        "nodes: {},  edges: {}",
+        "Nodes: {},  Edges: {}",
         graph.node_count(),
         graph.edge_count()
     );
+
+    binary_partition_tree(&mut graph);
 
     let segmented_img = draw_segments(&img, labels);
 

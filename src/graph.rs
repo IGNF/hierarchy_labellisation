@@ -1,20 +1,21 @@
-use ndarray::{s, Array1, Array2, Array3};
+use ndarray::{s, Array1, Array2, Array3, Zip};
 use petgraph::{graph::NodeIndex, prelude::UnGraph};
 
 use crate::plef::{Plef, PlefPiece};
 
-type SuperpixelGraph = UnGraph<SuperpixelNode, SuperpixelEdge>;
+pub type SuperpixelGraph = UnGraph<SuperpixelNode, SuperpixelEdge>;
 
+#[derive(Debug, Clone)]
 pub struct SuperpixelNode {
-    area: u32,                 // number of pixels in the superpixel
-    perimeter: u32,            // perimiter of the superpixel
-    values: Array1<u32>,       // sum of values inside the superpixel
-    values_sq: Array1<u32>,    // sum of squared values inside the superpixel
-    optimal_energy: Plef<f64>, // optimal energy of the superpixel
+    pub area: u32,                 // number of pixels in the superpixel
+    pub perimeter: u32,            // perimiter of the superpixel
+    pub values: Array1<u32>,       // sum of values inside the superpixel
+    pub values_sq: Array1<u32>,    // sum of squared values inside the superpixel
+    pub optimal_energy: Plef<f64>, // optimal energy of the superpixel
 }
 
 impl SuperpixelNode {
-    fn new(
+    pub fn new(
         area: u32,
         perimeter: u32,
         values: Array1<u32>,
@@ -41,14 +42,20 @@ impl SuperpixelNode {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct SuperpixelEdge {
-    weight: f64,
-    length: u32,
+    pub weight: f64,
+    pub length: u32,
+    pub active: bool, // Maybe move into an array in the hierarchy algorithm
 }
 
 impl SuperpixelEdge {
-    fn new(weight: f64, length: u32) -> Self {
-        Self { weight, length }
+    pub fn new(weight: f64, length: u32) -> Self {
+        Self {
+            weight,
+            length,
+            active: true,
+        }
     }
 
     fn init() -> Self {
@@ -56,10 +63,16 @@ impl SuperpixelEdge {
     }
 }
 
+pub fn data_fidelity(mean: &Array1<u32>, mean2: &Array1<u32>, area: u32) -> f64 {
+    Zip::from(mean2).and(mean).fold(0., |acc, &mean2, &mean| {
+        acc + mean2 as f64 - (mean as f64).powi(2) / area as f64
+    })
+}
+
 pub fn apparition_scale(
-    edge: &SuperpixelEdge,
     source: &SuperpixelNode,
     target: &SuperpixelNode,
+    edge_length: u32,
 ) -> f64 {
     let mut e = source.optimal_energy.sum(&target.optimal_energy, None);
 
@@ -67,13 +80,13 @@ pub fn apparition_scale(
     let mean2 = &source.values_sq + &target.values_sq;
     let a = &source.area + &target.area;
 
-    let data_fidelity = mean2.mapv(f64::from) - (&mean * &mean).mapv(f64::from) / a as f64;
+    let data_fidelity = data_fidelity(&mean, &mean2, a);
 
-    let merge_perimeter = &source.perimeter + &target.perimeter - 2 * edge.length;
+    let merge_perimeter = &source.perimeter + &target.perimeter - 2 * edge_length;
 
     e.infimum(PlefPiece {
         start_x: 0.0,
-        start_y: data_fidelity.sum(),
+        start_y: data_fidelity,
         slope: merge_perimeter as f64,
     })
 }
@@ -136,8 +149,7 @@ pub fn graph_from_labels(img: &Array3<u8>, labels: &Array2<usize>) -> Superpixel
 
     // Initialize optimal energy
     for node in graph.node_weights_mut() {
-        let data_fidelity = &node.values_sq - &node.values.mapv(|x| x * x) / node.area;
-        let data_fidelity = data_fidelity.sum() as f64;
+        let data_fidelity = data_fidelity(&node.values, &node.values_sq, node.area);
 
         let plef = Plef::from(PlefPiece::new(0., data_fidelity, node.perimeter as f64));
         node.optimal_energy = plef;
@@ -150,7 +162,7 @@ pub fn graph_from_labels(img: &Array3<u8>, labels: &Array2<usize>) -> Superpixel
         let t_node = &graph[t_i];
         let edge = &graph[edge_i];
 
-        graph[edge_i].weight = apparition_scale(&edge, &s_node, &t_node);
+        graph[edge_i].weight = apparition_scale(&s_node, &t_node, edge.length);
     }
 
     graph
