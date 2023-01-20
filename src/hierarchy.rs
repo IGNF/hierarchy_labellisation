@@ -1,9 +1,9 @@
-use std::{collections::{BinaryHeap, HashMap}, cmp::Ordering};
-
-use petgraph::{
-    data::DataMap,
-    prelude::{EdgeIndex, NodeIndex},
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap},
 };
+
+use petgraph::prelude::{EdgeIndex, NodeIndex};
 
 use crate::{
     console_log,
@@ -32,11 +32,15 @@ impl Ord for EdgeWrapper {
     }
 }
 
-pub(crate) fn binary_partition_tree(graph: &mut SuperpixelGraph) {
+pub struct PartitionTree {
+    pub parents: Vec<usize>,
+    pub levels: Vec<f64>,
+}
 
+pub(crate) fn binary_partition_tree(mut graph: SuperpixelGraph) -> PartitionTree {
     let num_points = graph.node_count();
-    let parents = (0..num_points).collect::<Vec<_>>();
-    let levels = vec![0.0; num_points];
+    let mut parents = (0..num_points).collect::<Vec<_>>();
+    let mut levels = vec![0.0; num_points];
 
     let mut heap: BinaryHeap<EdgeWrapper> = BinaryHeap::new();
 
@@ -59,10 +63,8 @@ pub(crate) fn binary_partition_tree(graph: &mut SuperpixelGraph) {
     let mut neighors = HashMap::<NodeIndex, Vec<EdgeIndex>>::new();
 
     while !heap.is_empty() {
-        merge_operations += 1;
         let top = heap.pop().unwrap();
 
-        console_log!("fusion_edge top: {:?}", top);
         let fusion_edge_index = top.index;
         let fusion_edge = graph.edge_weight_mut(fusion_edge_index).unwrap();
 
@@ -121,9 +123,17 @@ pub(crate) fn binary_partition_tree(graph: &mut SuperpixelGraph) {
             )
         };
 
+        let fusion_weight = fusion_edge.weight;
         let new_node_id = graph.add_node(new_node);
 
-        // TODO: Add to parent list
+        assert!(parents.len() == new_node_id.index());
+        assert!(levels.len() == new_node_id.index());
+
+        parents.push(new_node_id.index());
+        levels.push(fusion_weight);
+
+        parents[a.index()] = new_node_id.index();
+        parents[b.index()] = new_node_id.index();
 
         for (neighbor_id, old_edges) in &neighors {
             let neighbor_id = *neighbor_id;
@@ -145,7 +155,11 @@ pub(crate) fn binary_partition_tree(graph: &mut SuperpixelGraph) {
                 weight,
             });
         }
+
+        merge_operations += 1;
     }
 
-    console_log!("Merge operations: {:?}", merge_operations)
+    console_log!("Merge operations: {:?}", merge_operations);
+
+    PartitionTree { parents, levels }
 }

@@ -1,5 +1,8 @@
-import { convert_to_png, hierarchical_segmentation_from_js, slic_from_js } from 'hierarchy_labellisation';
+import { build_hierarchy_wasm, display_labels_wasm, cut_hierarchy_wasm, Hierarchy } from 'hierarchy_labellisation';
 import { fromArrayBuffer, TypedArray } from 'geotiff';
+
+let hierarchy: Hierarchy | null = null;
+let tiff: Awaited<ReturnType<typeof readTiff>> | null = null;
 
 function setupFileInput() {
     const fileSelector = document.getElementById('file-selector') as HTMLInputElement;
@@ -19,6 +22,24 @@ function setupFileInput() {
             }
             reader.readAsArrayBuffer(file);
         }
+    });
+}
+
+function setupSlider() {
+    const slider = document.getElementById('slider') as HTMLInputElement;
+
+    let working = false;
+    slider.addEventListener('input', async (_) => {
+        const value = slider.valueAsNumber;
+        if (working) {
+            return;
+        }
+        working = true;
+        await handleSlider(value);
+
+        requestAnimationFrame(() => {
+            working = false;
+        });
     });
 }
 
@@ -51,29 +72,60 @@ async function readTiff(buffer: ArrayBuffer) {
     }
 }
 
-function createImageElement(data: Uint8Array): HTMLImageElement {
-    const blob = new Blob([data], { type: 'image/png' });
-    const url = URL.createObjectURL(blob);
-
-    const img = document.createElement('img');
-    img.src = url;
-    img.width = 600;
-    return img;
-}
-
 async function processTiff(buffer: ArrayBuffer) {
-    const tiff = await readTiff(buffer);
+    tiff = await readTiff(buffer);
 
     console.log(tiff);
+    console.log('Building hierarchy...')
+    hierarchy = build_hierarchy_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, 10000);
 
-    const result = hierarchical_segmentation_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 1000);
-    
-    // const result = slic_from_js(tiff.data, tiff.width, tiff.height, tiff.channels, 10000, 10);
-    const app = document.getElementById('app')!;
-    const img = createImageElement(result);
-    app.appendChild(img);
+    console.log(hierarchy);
 
-    console.log('Done')
+    console.log('Cutting hierarchy...');
+    const labels = cut_hierarchy_wasm(hierarchy, 0);
+
+    console.log('Displaying labels...');
+    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, labels);
+
+    const uint8ClampedArray = new Uint8ClampedArray(bitmapResult);
+    const imageData = new ImageData(uint8ClampedArray, tiff.width, tiff.height);
+    const imageBitmap = await createImageBitmap(imageData);
+
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = tiff.width;
+    canvas.height = tiff.height;
+    ctx.drawImage(imageBitmap, 0, 0);
+}
+
+async function handleSlider(value: number) {
+    if (hierarchy === null || tiff === null) {
+        return;
+    }
+
+    const maxValue = Math.log2(hierarchy.max_level);
+    const logValue = value * maxValue;
+    const level = Math.pow(2, logValue);
+
+    console.log('Cutting hierarchy...');
+    const labels = cut_hierarchy_wasm(hierarchy, level);
+
+    console.log('Displaying labels...');
+    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, labels);
+
+    console.log('Rendering canvas...');
+    const uint8ClampedArray = new Uint8ClampedArray(bitmapResult);
+    const imageData = new ImageData(uint8ClampedArray, tiff.width, tiff.height);
+    const imageBitmap = await createImageBitmap(imageData);
+
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = tiff.width;
+    canvas.height = tiff.height;
+    ctx.drawImage(imageBitmap, 0, 0);
+
+    console.log('Done.');
 }
 
 setupFileInput();
+setupSlider();

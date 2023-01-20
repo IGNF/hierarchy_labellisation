@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use image::{ImageBuffer, ImageOutputFormat, Rgb};
-use ndarray::{s, Array3, ArrayView3, Array2};
+use ndarray::{concatenate, s, Array2, Array3, ArrayView3, Axis};
 use simple_clustering::image::segment_contours;
 use wasm_bindgen::UnwrapThrowExt;
 
@@ -32,12 +32,27 @@ pub(crate) fn array_to_png(input: ArrayView3<u8>) -> Vec<u8> {
     image_to_png(img)
 }
 
+pub(crate) fn array_to_rgba_bitmap(input: ArrayView3<u8>) -> Vec<u8> {
+    let rgb = input.slice(s![.., .., 0..3]);
+    let rgb = rgb.to_owned();
+
+    let (height, width, _channels) = rgb.dim();
+
+    let alpha = Array3::from_elem((height, width, 1), 255u8);
+
+    let rgba: Array3<u8> = concatenate![Axis(2), rgb, alpha];
+
+    let std = rgba.as_standard_layout();
+
+    std.as_slice().unwrap().to_vec()
+}
+
 pub(crate) fn draw_segments(img: &Array3<u8>, labels: Array2<usize>) -> Array3<u8> {
     let (height, width, _channels) = img.dim();
     let labels = labels.into_raw_vec();
 
     // Only take the first 3 channels to visualize the segmentation
-    let img_visu = img.slice(s![.., .., ..3usize]).to_owned();
+    let img_visu = img.slice(s![.., .., ..3usize]);
     let mut img_visu_std = img_visu.as_standard_layout();
     let img_visu_slice = img_visu_std
         .as_slice_mut()

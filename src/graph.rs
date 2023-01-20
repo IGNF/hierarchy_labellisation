@@ -9,6 +9,7 @@ pub type SuperpixelGraph = UnGraph<SuperpixelNode, SuperpixelEdge>;
 pub struct SuperpixelNode {
     pub area: u32,                 // number of pixels in the superpixel
     pub perimeter: u32,            // perimiter of the superpixel
+    // TODO maybe use u64 to avoid overflow
     pub values: Array1<u32>,       // sum of values inside the superpixel
     pub values_sq: Array1<u32>,    // sum of squared values inside the superpixel
     pub optimal_energy: Plef<f64>, // optimal energy of the superpixel
