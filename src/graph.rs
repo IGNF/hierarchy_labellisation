@@ -64,9 +64,9 @@ impl SuperpixelEdge {
     }
 }
 
-pub fn data_fidelity(mean: &Array1<u32>, mean2: &Array1<u32>, area: u32) -> f64 {
-    Zip::from(mean2).and(mean).fold(0., |acc, &mean2, &mean| {
-        acc + mean2 as f64 - (mean as f64).powi(2) / area as f64
+pub fn data_fidelity(values: &Array1<u32>, values_sq: &Array1<u32>, area: u32) -> f64 {
+    Zip::from(values_sq).and(values).fold(0., |acc, &value_sq, &value| {
+        acc + value_sq as f64 - (value as f64).powi(2) / area as f64
     })
 }
 
@@ -77,11 +77,11 @@ pub fn apparition_scale(
 ) -> f64 {
     let mut e = source.optimal_energy.sum(&target.optimal_energy, None);
 
-    let mean = &source.values + &target.values;
-    let mean2 = &source.values_sq + &target.values_sq;
+    let values = &source.values + &target.values;
+    let values_sq = &source.values_sq + &target.values_sq;
     let a = &source.area + &target.area;
 
-    let data_fidelity = data_fidelity(&mean, &mean2, a);
+    let data_fidelity = data_fidelity(&values, &values_sq, a);
 
     let merge_perimeter = &source.perimeter + &target.perimeter - 2 * edge_length;
 
