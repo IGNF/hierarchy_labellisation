@@ -12,7 +12,7 @@ function setupFileInput() {
         for (let i = 0; i < files.length; i++) {
             const file = files.item(i)!;
 
-            console.log(file.name);
+            console.log(`Loading file (${file.name})...`);
 
             const reader = new FileReader();
             reader.onload = (_) => {
@@ -75,9 +75,10 @@ async function readTiff(buffer: ArrayBuffer) {
 async function processTiff(buffer: ArrayBuffer) {
     tiff = await readTiff(buffer);
 
-    console.log(tiff);
+    console.log(`Loaded image (${tiff.width}x${tiff.height}x${tiff.channels}).`);
     console.log('Building hierarchy...')
-    hierarchy = build_hierarchy_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, 10000);
+    const clusterCount = Math.round(tiff.width * tiff.height / 300);
+    hierarchy = build_hierarchy_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, clusterCount);
 
     console.log(hierarchy);
 
@@ -85,7 +86,7 @@ async function processTiff(buffer: ArrayBuffer) {
     const labels = cut_hierarchy_wasm(hierarchy, 0);
 
     console.log('Displaying labels...');
-    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, labels);
+    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, labels);
 
     const uint8ClampedArray = new Uint8ClampedArray(bitmapResult);
     const imageData = new ImageData(uint8ClampedArray, tiff.width, tiff.height);
