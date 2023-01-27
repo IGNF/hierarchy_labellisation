@@ -33,18 +33,20 @@ pub(crate) fn array_to_png(input: ArrayView3<u8>) -> Vec<u8> {
 }
 
 pub(crate) fn array_to_rgba_bitmap(input: ArrayView3<u8>) -> Vec<u8> {
-    let rgb = input.slice(s![.., .., 0..3]);
-    let rgb = rgb.to_owned();
+    let (height, width, _channels) = input.dim();
 
-    let (height, width, _channels) = rgb.dim();
+    let mut output = vec![255; (height * width * 4) as usize];
 
-    let alpha = Array3::from_elem((height, width, 1), 255u8);
+    for (y, row) in input.outer_iter().enumerate() {
+        for (x, pixel) in row.outer_iter().enumerate() {
+            let i = (y * width + x) as usize;
+            output[i * 4] = pixel[0];
+            output[i * 4 + 1] = pixel[1];
+            output[i * 4 + 2] = pixel[2];
+        }
+    }
 
-    let rgba: Array3<u8> = concatenate![Axis(2), rgb, alpha];
-
-    let std = rgba.as_standard_layout();
-
-    std.as_slice().unwrap().to_vec()
+    output
 }
 
 pub(crate) fn draw_segments(img: &Array3<u8>, labels: Array2<usize>) -> Array3<u8> {

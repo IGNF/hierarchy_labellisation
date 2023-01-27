@@ -111,7 +111,7 @@ async function handleSlider(value: number) {
     const labels = cut_hierarchy_wasm(hierarchy, level);
 
     console.log('Displaying labels...');
-    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, labels);
+    const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, labels);
 
     console.log('Rendering canvas...');
     const uint8ClampedArray = new Uint8ClampedArray(bitmapResult);

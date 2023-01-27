@@ -119,11 +119,7 @@ pub fn build_hierarchy_wasm(
 
 #[wasm_bindgen]
 pub fn cut_hierarchy_wasm(hierarchy: &Hierarchy, level: f64) -> Vec<usize> {
-    let levels = hierarchy
-        .levels
-        .iter()
-        .cloned()
-        .enumerate();
+    let levels = hierarchy.levels.iter().cloned().enumerate();
 
     let mut label_rewrites = HashMap::<usize, Vec<usize>>::new();
 
@@ -168,21 +164,30 @@ pub fn cut_hierarchy_wasm(hierarchy: &Hierarchy, level: f64) -> Vec<usize> {
 
 #[wasm_bindgen]
 pub fn display_labels_wasm(
-    img: Vec<u8>,
+    mut img: Vec<u8>,
     width: usize,
     height: usize,
-    channels: usize,
     labels: Vec<usize>,
 ) -> Vec<u8> {
-    let mut img =
-        Array3::from_shape_vec((channels, height, width), img).expect_throw("Img wrong shape");
+    // Only take first 3 channels
+    img.truncate(width * height * 3);
+
+    let mut img = Array3::from_shape_vec((3, height, width), img).expect_throw("Img wrong shape");
 
     img.swap_axes(0, 1);
     img.swap_axes(1, 2);
 
     let labels = Array2::from_shape_vec((height, width), labels).expect_throw("Labels wrong shape");
 
-    let res_img = draw_segments(&img, labels);
+    for (i, row) in labels.outer_iter().enumerate().take(height - 1) {
+        for (j, label) in row.iter().enumerate().take(width - 1) {
+            if label != &labels[[i + 1, j]] || label != &labels[[i, j + 1]] {
+                img[[i, j, 0]] = 0;
+                img[[i, j, 1]] = 0;
+                img[[i, j, 2]] = 0;
+            }
+        }
+    }
 
-    array_to_rgba_bitmap(res_img.view())
+    array_to_rgba_bitmap(img.view())
 }
