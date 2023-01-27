@@ -88,6 +88,18 @@ async function processTiff(buffer: ArrayBuffer) {
     console.log('Displaying labels...');
     const bitmapResult = display_labels_wasm(tiff.data, tiff.width, tiff.height, labels);
 
+    // Display levels
+    const sliderValues = document.getElementsByClassName('slider-values')[0];
+    const maxValue = Math.log2(hierarchy.max_level);
+    Array.from(sliderValues.children).forEach((node, i) => {
+        const logValue = (1 - i / 10) * maxValue;
+        node.textContent = `- ${logValue.toFixed(2)}`;
+    });
+
+    // Reset slider
+    const slider = document.getElementById('slider') as HTMLInputElement;
+    slider.value = '0';
+
     const uint8ClampedArray = new Uint8ClampedArray(bitmapResult);
     const imageData = new ImageData(uint8ClampedArray, tiff.width, tiff.height);
     const imageBitmap = await createImageBitmap(imageData);
