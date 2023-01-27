@@ -6,7 +6,7 @@ use crate::slic_helpers::{
 
 use simple_clustering::error::ScError;
 
-use ndarray::{s, Array1, Array3, Array2};
+use ndarray::{s, Array1, Array2, Array3};
 use num_traits::ToPrimitive;
 
 /// Information for tracking image pixels' nearest superpixel cluster and

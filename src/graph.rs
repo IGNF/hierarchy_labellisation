@@ -7,11 +7,10 @@ pub type SuperpixelGraph = UnGraph<SuperpixelNode, SuperpixelEdge>;
 
 #[derive(Debug, Clone)]
 pub struct SuperpixelNode {
-    pub area: u32,                 // number of pixels in the superpixel
-    pub perimeter: u32,            // perimiter of the superpixel
-    // TODO maybe use u64 to avoid overflow
-    pub values: Array1<u32>,       // sum of values inside the superpixel
-    pub values_sq: Array1<u32>,    // sum of squared values inside the superpixel
+    pub area: u32,      // number of pixels in the superpixel
+    pub perimeter: u32, // perimiter of the superpixel
+    pub values: Array1<u64>,       // sum of values inside the superpixel
+    pub values_sq: Array1<u64>,    // sum of squared values inside the superpixel
     pub optimal_energy: Plef<f64>, // optimal energy of the superpixel
 }
 
@@ -19,8 +18,8 @@ impl SuperpixelNode {
     pub fn new(
         area: u32,
         perimeter: u32,
-        values: Array1<u32>,
-        values_sq: Array1<u32>,
+        values: Array1<u64>,
+        values_sq: Array1<u64>,
         optimal_energy: Plef<f64>,
     ) -> Self {
         Self {
@@ -64,26 +63,24 @@ impl SuperpixelEdge {
     }
 }
 
-pub fn data_fidelity(values: &Array1<u32>, values_sq: &Array1<u32>, area: u32) -> f64 {
-    Zip::from(values_sq).and(values).fold(0., |acc, &value_sq, &value| {
-        acc + value_sq as f64 - (value as f64).powi(2) / area as f64
-    })
+pub fn data_fidelity(values: &Array1<u64>, values_sq: &Array1<u64>, area: u32) -> f64 {
+    Zip::from(values_sq)
+        .and(values)
+        .fold(0., |acc, &value_sq, &value| {
+            acc + value_sq as f64 - (value as f64).powi(2) / area as f64
+        })
 }
 
-pub fn apparition_scale(
-    source: &SuperpixelNode,
-    target: &SuperpixelNode,
-    edge_length: u32,
-) -> f64 {
+pub fn apparition_scale(source: &SuperpixelNode, target: &SuperpixelNode, edge_length: u32) -> f64 {
     let mut e = source.optimal_energy.sum(&target.optimal_energy, None);
 
     let values = &source.values + &target.values;
     let values_sq = &source.values_sq + &target.values_sq;
-    let a = &source.area + &target.area;
+    let a = source.area + target.area;
 
     let data_fidelity = data_fidelity(&values, &values_sq, a);
 
-    let merge_perimeter = &source.perimeter + &target.perimeter - 2 * edge_length;
+    let merge_perimeter = source.perimeter + target.perimeter - 2 * edge_length;
 
     e.infimum(PlefPiece {
         start_x: 0.0,
@@ -107,9 +104,9 @@ pub fn graph_from_labels(img: &Array3<u8>, labels: &Array2<usize>) -> Superpixel
         // Update superpixel area and values
         let node_i = &mut graph[i];
         node_i.area += 1;
-        let pixel = img.slice(s![y, x, ..]).mapv(u32::from);
-        node_i.values = &pixel + &node_i.values;
-        node_i.values_sq = pixel.mapv(|x| x * x) + &node_i.values_sq;
+        let pixel = img.slice(s![y, x, ..]).mapv(u64::from);
+        node_i.values += &pixel;
+        node_i.values_sq += &pixel.mapv(|x| x * x);
 
         // Loop over the neighbors (right and bottom)
         for (dy, dx) in [(0, 1), (1, 0)].iter() {
@@ -163,7 +160,7 @@ pub fn graph_from_labels(img: &Array3<u8>, labels: &Array2<usize>) -> Superpixel
         let t_node = &graph[t_i];
         let edge = &graph[edge_i];
 
-        graph[edge_i].weight = apparition_scale(&s_node, &t_node, edge.length);
+        graph[edge_i].weight = apparition_scale(s_node, t_node, edge.length);
     }
 
     graph

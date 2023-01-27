@@ -112,7 +112,7 @@ pub(crate) fn binary_partition_tree(mut graph: SuperpixelGraph) -> PartitionTree
 
             let data_fidelity = data_fidelity(&values, &values_sq, area);
             let mut plef = node_a.optimal_energy.sum(&node_b.optimal_energy, None);
-            plef.infimum(PlefPiece::new(0., data_fidelity, perimeter as f64).into());
+            plef.infimum(PlefPiece::new(0., data_fidelity, perimeter as f64));
 
             SuperpixelNode::new(
                 node_a.area + node_b.area,
@@ -147,7 +147,7 @@ pub(crate) fn binary_partition_tree(mut graph: SuperpixelGraph) -> PartitionTree
 
             let neighbor_node = graph.node_weight(neighbor_id).unwrap();
 
-            let weight = apparition_scale(&graph[new_node_id], &neighbor_node, length);
+            let weight = apparition_scale(&graph[new_node_id], neighbor_node, length);
             let new_edge = SuperpixelEdge::new(weight, length);
             let new_edge_id = graph.add_edge(new_node_id, neighbor_id, new_edge);
             heap.push(EdgeWrapper {

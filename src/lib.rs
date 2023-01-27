@@ -14,7 +14,7 @@ use slic::slic;
 use hierarchy::binary_partition_tree;
 use ndarray::{Array2, Array3};
 use std::collections::HashMap;
-use utils::{array_to_png, array_to_rgba_bitmap, draw_segments};
+use utils::{array_to_png, array_to_rgba_bitmap};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -32,10 +32,9 @@ pub fn hierarchical_segmentation(
     img: Array3<u8>,
     n_clusters: usize,
 ) -> (Array2<usize>, PartitionTree) {
-    console_log!("Starting slic");
-    let labels = slic(n_clusters as u32, 1, Some(3), &img).expect_throw("SLIC failed");
+    console_log!("Running SLIC...");
+    let labels = slic(n_clusters as u32, 1, Some(1), &img).expect_throw("SLIC failed");
 
-    console_log!("Slic done");
     console_log!("Creating graph from segmentation...");
 
     let graph = graph_from_labels(&img, &labels);
@@ -48,34 +47,7 @@ pub fn hierarchical_segmentation(
 
     let partition_tree = binary_partition_tree(graph);
 
-    // let segmented_img = draw_segments(&img, labels);
-
     (labels, partition_tree)
-}
-
-#[wasm_bindgen]
-pub fn slic_from_js(
-    data: &[u8],
-    width: usize,
-    height: usize,
-    channels: usize,
-    n_clusters: usize,
-    _compactness: f32,
-) -> Box<[u8]> {
-    let mut array = Array3::from_shape_vec((channels, height, width), data.to_vec())
-        .expect_throw("Data doesn't have the right shape");
-
-    array.swap_axes(0, 1);
-    array.swap_axes(1, 2);
-
-    console_log!("Dimensions: {:?}", array.dim());
-
-    let labels = slic::slic(n_clusters as u32, 1, Some(10), &array).expect_throw("SLIC failed");
-
-    let segmented_img = draw_segments(&array, labels);
-
-    let buffer = array_to_png(segmented_img.view());
-    buffer.into_boxed_slice()
 }
 
 #[wasm_bindgen(getter_with_clone)]

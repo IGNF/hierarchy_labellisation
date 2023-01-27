@@ -1,8 +1,7 @@
 use std::io::Cursor;
 
 use image::{ImageBuffer, ImageOutputFormat, Rgb};
-use ndarray::{concatenate, s, Array2, Array3, ArrayView3, Axis};
-use simple_clustering::image::segment_contours;
+use ndarray::{s, ArrayView3};
 use wasm_bindgen::UnwrapThrowExt;
 
 pub(crate) fn array_to_image(input: ArrayView3<u8>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
@@ -47,19 +46,4 @@ pub(crate) fn array_to_rgba_bitmap(input: ArrayView3<u8>) -> Vec<u8> {
     }
 
     output
-}
-
-pub(crate) fn draw_segments(img: &Array3<u8>, labels: Array2<usize>) -> Array3<u8> {
-    let (height, width, _channels) = img.dim();
-    let labels = labels.into_raw_vec();
-
-    // Only take the first 3 channels to visualize the segmentation
-    let img_visu = img.slice(s![.., .., ..3usize]);
-    let mut img_visu_std = img_visu.as_standard_layout();
-    let img_visu_slice = img_visu_std
-        .as_slice_mut()
-        .expect_throw("Fail to convert to slice");
-    segment_contours(img_visu_slice, width as u32, height as u32, &labels, [0; 3])
-        .expect_throw("Failed to compute contours");
-    img_visu_std.to_owned()
 }

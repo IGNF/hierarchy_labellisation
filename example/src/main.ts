@@ -77,7 +77,7 @@ async function processTiff(buffer: ArrayBuffer) {
 
     console.log(`Loaded image (${tiff.width}x${tiff.height}x${tiff.channels}).`);
     console.log('Building hierarchy...')
-    const clusterCount = Math.round(tiff.width * tiff.height / 300);
+    const clusterCount = Math.round(tiff.width * tiff.height / 200);
     hierarchy = build_hierarchy_wasm(tiff.data, tiff.width, tiff.height, tiff.channels, clusterCount);
 
     console.log(hierarchy);
