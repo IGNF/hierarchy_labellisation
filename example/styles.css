@@ -25,13 +25,13 @@ body {
 }
 
 .app-body {
-    height: 100%;
+    min-height: 0;
     flex-grow: 1;
     display: flex;
     flex-direction: row;
 }
 
-input[type=range]{
+input[type=range] {
     -webkit-appearance: slider-vertical;
     -moz-appearance: slider-vertical;
     width: 16px;
