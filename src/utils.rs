@@ -26,11 +26,6 @@ pub(crate) fn image_to_png(img: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Vec<u8> {
     buffer
 }
 
-pub(crate) fn array_to_png(input: ArrayView3<u8>) -> Vec<u8> {
-    let img = array_to_image(input.slice(s![.., .., 0..3]));
-    image_to_png(img)
-}
-
 pub(crate) fn array_to_rgba_bitmap(input: ArrayView3<u8>) -> Vec<u8> {
     let (height, width, _channels) = input.dim();
 

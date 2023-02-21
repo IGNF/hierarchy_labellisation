@@ -9,6 +9,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+console_error_panic_hook = "0.1.7"
 image = "0.24.4"
 ndarray = "0.15.6"
 num-traits = "0.2.15"

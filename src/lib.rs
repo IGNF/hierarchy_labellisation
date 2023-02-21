@@ -13,19 +13,13 @@ use slic::slic;
 
 use hierarchy::binary_partition_tree;
 use ndarray::{Array2, Array3};
-use std::collections::HashMap;
-use utils::{array_to_png, array_to_rgba_bitmap};
+use std::{collections::HashMap, panic};
+use utils::array_to_rgba_bitmap;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-pub fn convert_to_png(data: &[u8], width: usize, height: usize, channels: usize) -> Box<[u8]> {
-    let array = Array3::from_shape_vec((channels, height, width), data.to_vec())
-        .expect_throw("Data doesn't have the right shape");
-
-    // Convert to png and return
-    let buffer = array_to_png(array.view());
-
-    buffer.into_boxed_slice()
+#[wasm_bindgen(start)]
+pub fn init() {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 
 pub fn hierarchical_segmentation(
